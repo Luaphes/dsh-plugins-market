@@ -1,0 +1,8 @@
+# dsh-plugins-market bundle patch: contributes one profile row.
+# The node half (lib/index.js) registers the market API routes on the
+# web server (loopback-trusted); the browser half ships via
+# exports["./client"] and the package.json `dsh.client` declaration.
+
+- insert:
+    - id: dsh-plugins-market
+      name: 'dsh-plugins-market'

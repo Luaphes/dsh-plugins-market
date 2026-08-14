@@ -4,7 +4,7 @@
 
 > Discover DeepSeek Harness plugins from the official `dsh-plugin` topic — noise-filtered, trust-badged, one-click install into your profile.
 
-**Status: prototype.** Currently runs as a dynamic Cordis plugin inside the dsh Web UI Plugins settings area (session-scoped). Persistent npm bundle packaging is in progress; one-line `dsh plugin add` install is coming soon.
+**Status: beta, installable.** A persistent npm bundle: install once into your profile, restart the Web UI, and it stays. The `src/` directory holds the equivalent dynamic-plugin reference implementation.
 
 ## What it does
 
@@ -12,6 +12,16 @@
 - **Trust signals**: badges for `精选` (human-curated) and community compatibility verdicts (`兼容` / `需适配` / `已删除` / `关注`)
 - **Ranking & filtering**: by stars / newest / last push (asc/desc toggle), instant search, language filter
 - **Install funnel**: click Install → verify the repo declares `dsh.bundle.patch` in package.json (non-bundles are rejected) → show the exact command with an allowBuilds security warning → confirm → run `dsh plugin --profile <p> add github:owner/repo`
+
+## Install
+
+```sh
+dsh plugin --profile web add github:Luaphes/dsh-plugins-market
+```
+
+Restart the Web UI afterwards; a "Discover plugins" tab appears under Settings → Plugins. Zero build step, no install scripts, no allowBuilds prompt.
+
+Once published to npm: `dsh plugin --profile web add dsh-plugins-market`
 
 ## Architecture
 
@@ -27,7 +37,8 @@
 
 ## Roadmap
 
-- [ ] Persistent npm bundle (`dsh plugin add` one-liner)
+- [x] Persistent npm bundle (installable from GitHub)
+- [ ] npm publish + CI auto-release (Trusted Publishing)
 - [ ] Weekly trending (daily star snapshots)
 - [ ] Standalone web site form (public discovery entry)
 
