@@ -1,4 +1,4 @@
-[English](README.md) | 简体中文
+[English](README.md) | [简体中文](README.zh-CN.md)
 
 # dsh-market · DeepSeek Harness 插件创意市场
 
