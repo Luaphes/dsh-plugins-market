@@ -23,6 +23,7 @@ jobs:
         run: |
           python3 - <<'EOF'
           import json, os, time, urllib.request
+          from urllib.error import HTTPError
 
           def fetch(page):
               url = f'https://api.github.com/search/repositories?q=topic:dsh-plugin&sort=stars&order=desc&per_page=100&page={page}'
@@ -37,8 +38,12 @@ jobs:
           today = time.strftime('%Y-%m-%d')
           repos = {}
           page = 1
-          while True:
-              d = fetch(page)
+          per_page = 100
+          while page * per_page <= 1000:
+              try:
+                  d = fetch(page)
+              except HTTPError:
+                  break
               for r in d.get('items', []):
                   repos[str(r['id'])] = {
                       'full_name': r['full_name'],
