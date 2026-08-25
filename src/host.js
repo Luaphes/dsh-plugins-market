@@ -30,6 +30,12 @@ export default {
     let crawlPromise = null
     const bundleCheckCache = new Map()
 
+    const SNAP_OWNER = 'Luaphes'
+    const SNAP_REPO = 'dsh-plugins-market'
+    const SNAP_DIR = 'snapshots'
+    let deltaCache = null
+    let deltaPromise = null
+
     const SOURCE_FILES = [
       { kind: 'radarTable', owner: 'AdamPlatin123', repo: 'awesome-dsh-plugins', path: 'README.md' },
       { kind: 'linkList', owner: '0xsline', repo: 'awesome-deepseek-harness', path: 'README.md' },
@@ -205,6 +211,63 @@ export default {
       console.log('[market] enriched: curated ' + curatedCount + ', radar-verdict ' + radarCount)
     }
 
+    async function loadDeltas() {
+      if (deltaCache && Date.now() - deltaCache.ts < CACHE_TTL) return deltaCache
+      if (deltaPromise) return deltaPromise
+      deltaPromise = (async () => {
+        try {
+          const apiUrl = 'https://api.github.com/repos/' + SNAP_OWNER + '/' + SNAP_REPO + '/contents/' + SNAP_DIR
+          const text = await fetchText(apiUrl, 100000)
+          if (text === null) return null
+          const dirListing = JSON.parse(text)
+          if (!Array.isArray(dirListing)) return null
+          const dates = dirListing
+            .map((f) => f.name && f.name.endsWith('.json') ? f.name.replace('.json', '') : null)
+            .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d || ''))
+            .sort()
+          if (dates.length === 0) return null
+          const latestDate = dates[dates.length - 1]
+          const latestTs = new Date(latestDate + 'T00:00:00Z').getTime()
+          let refDate = dates[0]
+          for (const d of dates) {
+            const dTs = new Date(d + 'T00:00:00Z').getTime()
+            if (latestTs - dTs >= 6 * 86400000) refDate = d
+          }
+          if (latestDate === refDate) return null
+          const latestRaw = await fetchGitHubFile(SNAP_OWNER, SNAP_REPO, SNAP_DIR + '/' + latestDate + '.json', 500000)
+          const refRaw = await fetchGitHubFile(SNAP_OWNER, SNAP_REPO, SNAP_DIR + '/' + refDate + '.json', 500000)
+          if (!latestRaw || !refRaw) return null
+          const latestSnap = JSON.parse(latestRaw)
+          const refSnap = JSON.parse(refRaw)
+          const deltaDays = Math.round((latestTs - new Date(refDate + 'T00:00:00Z').getTime()) / 86400000)
+          const result = { ts: Date.now(), latestSnap, refSnap, latestDate, refDate, deltaDays }
+          deltaCache = result
+          return result
+        } catch (err) {
+          console.log('[market] delta load failed: ' + String(err && err.message || err))
+          return null
+        }
+      })()
+      try { return await deltaPromise } finally { deltaPromise = null }
+    }
+
+    function enrichDeltas(repos, deltas) {
+      if (!deltas) return
+      const { latestSnap, refSnap, deltaDays } = deltas
+      let enriched = 0
+      for (const r of repos) {
+        const id = String(r.id)
+        const latest = latestSnap[id]
+        const ref = refSnap[id]
+        if (latest && ref) {
+          r.stars_delta = (latest.stars || 0) - (ref.stars || 0)
+          r.delta_days = deltaDays
+          enriched++
+        }
+      }
+      console.log('[market] delta enriched: ' + enriched + ' repos, span: ' + deltaDays + ' days')
+    }
+
     async function crawl() {
       if (index && Date.now() - index.ts < CACHE_TTL) return index
       if (crawlPromise) return crawlPromise
@@ -219,7 +282,21 @@ export default {
         for (let p = 2; p <= pages; p++) add((await githubPage(p)).items || [])
         const repos = Array.from(seen.values())
         await enrich(repos)
-        index = { ts: Date.now(), fetchedAt: new Date().toISOString(), repos }
+        let deltaDays = null
+        let latestDate = null
+        let refDate = null
+        try {
+          const deltas = await loadDeltas()
+          if (deltas) {
+            enrichDeltas(repos, deltas)
+            deltaDays = deltas.deltaDays
+            latestDate = deltas.latestDate
+            refDate = deltas.refDate
+          }
+        } catch (err) {
+          console.log('[market] delta enrichment failed: ' + String(err && err.message || err))
+        }
+        index = { ts: Date.now(), fetchedAt: new Date().toISOString(), repos, deltaDays, latestDate, refDate }
         console.log('[market] crawled ' + repos.length + ' repos')
         return index
       })()
@@ -269,7 +346,7 @@ export default {
 
     harness.handle('market.search', async (args) => {
       args = args || {}
-      const sort = args.sort === 'created' || args.sort === 'pushed' ? args.sort : 'stars'
+      const sort = args.sort === 'created' || args.sort === 'pushed' || args.sort === 'stars_delta' ? args.sort : 'stars'
       const order = args.order === 'asc' ? 1 : -1
       const page = Math.max(1, Math.floor(Number(args.page) || 1))
       const perPage = Math.min(100, Math.max(1, Math.floor(Number(args.per_page) || 30)))
@@ -288,10 +365,13 @@ export default {
       let repos = plugins
       if (language) repos = repos.filter((r) => r.language === language)
       if (q) repos = repos.filter((r) => (r.full_name + '\n' + r.description).toLowerCase().indexOf(q) !== -1)
-      const key = sort === 'created' ? 'created_at' : sort === 'pushed' ? 'pushed_at' : 'stars'
+      const key = sort === 'created' ? 'created_at' : sort === 'pushed' ? 'pushed_at' : sort === 'stars_delta' ? 'stars_delta' : 'stars'
       repos = repos.slice().sort((a, b) => {
         const va = a[key]
         const vb = b[key]
+        if (va === undefined && vb === undefined) return 0
+        if (va === undefined) return 1
+        if (vb === undefined) return -1
         if (va === vb) return 0
         if (typeof va === 'number') return (va - vb) * order
         return (va < vb ? -1 : 1) * order
@@ -311,6 +391,7 @@ export default {
         page,
         per_page: perPage,
         fetched_at: idx.fetchedAt,
+        delta_days: idx.deltaDays || null,
         repos: repos.slice(start, start + perPage),
         languages,
       }
