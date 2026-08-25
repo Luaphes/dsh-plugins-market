@@ -23,7 +23,7 @@ export default {
     const BLACKLIST = new Set(['titanwings/colleague-skill'])
     const EXCLUDE = new Set(['deepseek-ai/deepseek-harness'])
     const RADAR_STATUS_KEEP = { '兼容': true, '需适配': true, '关注': true, '已删除': true }
-    const PAGE_SLEEP = 3500
+    const PAGE_SLEEP = 5500
     const CACHE_TTL = 600000
     let lastHit = 0
     let index = null
@@ -275,7 +275,7 @@ export default {
       crawlPromise = (async () => {
         const first = await githubPage(1)
         const total = first.total_count || 0
-        const pages = Math.min(Math.max(1, Math.ceil(total / 100)), 10)
+        const pages = Math.min(Math.max(1, Math.ceil(total / 100)), 5)
         const seen = new Map()
         const add = (items) => { for (const r of items || []) seen.set(r.id, slim(r)) }
         add(first.items)
