@@ -8,9 +8,9 @@
 
 ## What it does
 
-- **Discovery**: crawls every repo under GitHub topic `dsh-plugin` (600+) and filters topic-squatting noise
+- **Discovery**: crawls GitHub topic `dsh-plugin` (top ~500 repos by stars; rate-limit friendly pacing, first load ~30s, then 10-minute cache) and filters topic-squatting noise
 - **Trust signals**: badges for `精选` (human-curated) and community compatibility verdicts (`兼容` / `需适配` / `已删除` / `关注`)
-- **Ranking & filtering**: by stars / newest / last push (asc/desc toggle), instant search, language filter
+- **Ranking & filtering**: by total stars / recent surge / newest / last push (asc/desc toggle), instant search, language filter; cards show `★ N (+M)` daily star delta when snapshot data covers the repo
 - **Install funnel**: click Install → verify the repo declares `dsh.bundle.patch` in package.json (non-bundles are rejected) → show the exact command with an allowBuilds security warning → confirm → run `dsh plugin --profile <p> add github:owner/repo`
 
 ## Install
@@ -25,7 +25,8 @@ Once published to npm: `dsh plugin --profile web add dsh-plugins-market`
 
 ## Architecture
 
-- Host half: full GitHub Search API crawl (rate-limit friendly, 10-minute in-memory cache), merges curated/compatibility source data, install verification & execution (approval-gated)
+- Host half: GitHub Search API crawl (rate-limit friendly, 10-minute in-memory cache), merges curated/compatibility source data, computes star deltas from daily snapshots, install verification & execution (approval-gated)
+- Daily snapshots: the `star-snapshots.yml` GitHub Actions workflow records topic repo stars at 02:00 UTC into `snapshots/YYYY-MM-DD.json`; the market serves deltas computed from the two most recent snapshots
 - Client half: registers the official `settings.plugins.tab` extension point, React card list
 - Zero LLM, zero backend, zero user quota: rules + public APIs only
 
@@ -39,7 +40,7 @@ Once published to npm: `dsh plugin --profile web add dsh-plugins-market`
 
 - [x] Persistent npm bundle (installable from GitHub)
 - [ ] npm publish + CI auto-release (Trusted Publishing)
-- [ ] Weekly trending (daily star snapshots)
+- [x] Trending (daily star snapshots → "recent surge" sort + per-card star delta)
 - [ ] Standalone web site form (public discovery entry)
 
 ## License

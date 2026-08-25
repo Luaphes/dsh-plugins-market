@@ -8,9 +8,9 @@
 
 ## 它做什么
 
-- **发现**：全量嗅探 GitHub topic `dsh-plugin`（600+ 仓库），过滤蹭标签的噪音仓库
+- **发现**：嗅探 GitHub topic `dsh-plugin`（按 star 取前 ~500 仓库；限速友好，首次加载约 30 秒，之后走 10 分钟缓存），过滤蹭标签的噪音仓库
 - **信任信号**：卡片徽章标注「精选」（人工收录）与社区兼容性实测状态（兼容 / 需适配 / 已删除 / 关注）
-- **排序与筛选**：总星数 / 最新发布 / 最近推送（升降序切换），搜索即时筛选，语言过滤
+- **排序与筛选**：总星数 / 近期飙升 / 最新发布 / 最近推送（升降序切换），搜索即时筛选，语言过滤；有快照数据时卡片展示 `★ N (+M)` 涨星幅度
 - **安装闭环**：点「安装」→ 校验 `package.json` 的 `dsh.bundle.patch` 声明（不是可安装插件的直接拒绝）→ 展示完整命令与 allowBuilds 安全警告 → 确认后执行 `dsh plugin --profile <p> add github:owner/repo`
 
 ## 安装
@@ -25,7 +25,8 @@ npm 渠道发布后：`dsh plugin --profile web add dsh-plugins-market`
 
 ## 架构
 
-- host 面：GitHub Search API 全量拉取（限速友好、内存缓存 10 分钟），精选/兼容性信源合并打标，安装校验与执行（审批闸门）
+- host 面：GitHub Search API 拉取（限速友好、内存缓存 10 分钟），精选/兼容性信源合并打标，基于每日快照计算涨星幅度，安装校验与执行（审批闸门）
+- 每日快照：`star-snapshots.yml` GitHub Actions 工作流每天 02:00 UTC 把 topic 仓库 star 写入 `snapshots/YYYY-MM-DD.json`；市场接口用最近两份快照计算涨幅
 - client 面：注册官方 `settings.plugins.tab` 扩展点，React 卡片流渲染
 - 零 LLM、零后端、零用户用量消耗：全部为规则与公开 API
 
@@ -39,7 +40,7 @@ npm 渠道发布后：`dsh plugin --profile web add dsh-plugins-market`
 
 - [x] 持久化 npm bundle（github 源可装）
 - [ ] npm 发布 + CI 自动发版（Trusted Publishing）
-- [ ] 周榜（每日 star 快照积累）
+- [x] 飙升榜（每日 star 快照 → 「近期飙升」排序 + 卡片涨星标注）
 - [ ] 独立 Web 站点形态（公开发现入口）
 
 ## License
